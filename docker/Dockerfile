@@ -27,6 +27,18 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# To visualize results
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libgl1-mesa-glx libgl1-mesa-dri libglfw3 mesa-utils\
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# To fix dependency resolver bug
+RUN pip install --upgrade pip setuptools wheel
+
+# To fix runtime error
+RUN pip install numpy --upgrade
+
 # Install MMEngine, MMCV and MMDetection
 RUN pip install openmim && \
     mim install "mmengine" "mmcv>=2.0.0rc4" "mmdet>=3.0.0"

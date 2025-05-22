@@ -20,24 +20,50 @@ docker run --gpus all --shm-size=8g -it --rm \
     mmdetection3d:0.0.1
 
 # 데이터 전처리 (--out-dir 경로 변경하면 제대로 생성 안됨)
+## mini 데이터셋 전체에 대해 실행하기 위해 코드 수정
+file "tools/dataset_converters/nuscenes_converter.py"
+line 57: 'val_scenes = splits.mini_val' -> 'val_scenes = splits.mini_val+splits.mini_train'
+line 277: 'else:' -> 'if sample['scene_token'] in val_scenes:'
+## 데이터 전처리 명령
 python tools/create_data.py nuscenes --root-path ./data/nuscenes --version "v1.0-mini" --out-dir ./data/nuscenes --extra-tag nuscenes
 
 # 테스트 실행
 ## 코드 수정
-mmdet3d/datasets/nuscenes_dataset.py
-line 63
-'v1.0-trainval' → 'v1.0-mini'
+file "mmdet3d/datasets/nuscenes_dataset.py" 
+line 63: 'v1.0-trainval' -> 'v1.0-mini'
+file "/opt/conda/lib/python3.7/site-packages/nuscenes/utils/splits.py"
+line 149: 'mini_val = mini_val + mini_train' 추가
+
 ## 테스트 실행 명렁
 python tools/test.py configs/centerpoint/centerpoint_voxel01_second_secfpn_8xb4-cyclic-20e_nus-3d.py \
     checkpoints/centerpoint_01voxel_second_secfpn_circlenms_4x8_cyclic_20e_nus_20220810_030004-9061688e.pth \
+    --cfg-options 'test_evaluator.jsonfile_prefix=results/nuscenes/v1.0-mini/3d_object_detection_results' \
     --work-dir results/nuscenes/v1.0-mini --task lidar_det --show --show-dir vis_images
+
+# 예측 파일 분석
+python seongjun_tools/nuscenes_result_analysis.py \
+    --json results/nuscenes/v1.0-mini/20250514_071813_pred_result/3d_object_detection_results/pred_instances_3d/results_nusc.json \
+    --pkl data/nuscenes/nuscenes_infos_val.pkl \
+    --output results/nuscenes/v1.0-mini/20250514_071813_pred_result/3d_object_detection_results/pred_instances_3d/results_nusc_analysis.csv
+
+# pkl 분석
+python seongjun_tools/pkl_analysis.py \
+    --pkl data/nuscenes/nuscenes_infos_val.pkl
+
+# 포멧 변환
+## 코드 수정
+file "/opt/conda/lib/python3.7/site-packages/nuscenes/utils/splits.py"
+line 150: 'mini_val = mini_val + mini_train' 추가
+## 포멧 변환 명령
+python seongjun_tools/convert_to_nus_ann.py \
+    --pred /mmdetection3d/results/nuscenes/v1.0-mini/20250515_131107_all_pred_result/3d_object_detection_results/pred_instances_3d/results_nusc.json \
+    --gt /mmdetection3d/data/nuscenes/v1.0-mini/sample_annotation.json \
+    --version v1.0-mini \
+    --dataroot /mmdetection3d/data/nuscenes \
+    --verbose True
+
 ## 기타 정보
 ### 에러나서 numpy 버전 업그레이드 (추후 도커 파일에 추가(완료))
 pip install numpy --upgrade
 ### 시각화 하려면 패키지 설치 (추후 도커파일에 추가(완료))
 apt-get update && apt-get install -y libgl1-mesa-glx libgl1-mesa-dri libglfw3 mesa-utils
-
-962f093736ffe55c089bc618842a8b8567318c8c
-fe25f7a51d36e3702f961e198894580d83c4387b
-Merge pull request #2867 from open-mmlab/dev-1.x
-
